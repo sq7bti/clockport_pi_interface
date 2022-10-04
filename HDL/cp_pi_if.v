@@ -26,7 +26,7 @@ module cp_pi_if(
     inout [7:0] PI_D,
 
     output INT6_n,
-    output reg PI_IRQ,
+    output reg PI_IRQ = 1'b0,
 
     output [15:0] RAM_A,
     output reg RAM_OE_n = 1'b1,
@@ -44,7 +44,7 @@ localparam [2:0] STATE_ADDRESS_STABLE = 3'd2;
 localparam [2:0] STATE_LATCH_OPEN = 3'd3;
 localparam [2:0] STATE_LATCH_CLOSED = 3'd4;
 
-reg [2:0] state;
+reg [2:0] state = STATE_IDLE;
 
 wire cp_rd = !RTC_CS_n && !IORD_n;
 wire cp_wr = !RTC_CS_n && !IOWR_n;
@@ -65,19 +65,19 @@ assign INT6_n = cp_irq ? 1'b0 : 1'bz;
 
 assign OE_OUT_n = !cp_rd;
 
-reg [1:0] access_reg;
-reg write_access;
-reg cp_access;
+reg [1:0] access_reg = 2'b0;
+reg write_access = 1'b0;
+reg cp_access = 1'b0;
 
-reg drive_data_from_pi;
+reg drive_data_from_pi = 1'b0;
 wire drive_irq = state != STATE_IDLE && access_reg == REG_IRQ && !write_access;
 assign D = drive_data_from_pi ? PI_D : (drive_irq ? {7'd0, cp_access ? cp_irq : PI_IRQ} : 8'bz);
 
-reg [7:0] pi_data;
+reg [7:0] pi_data; // = 8'h0;
 assign PI_D = PI_REQ && !PI_WR ? pi_data : 8'bz;
 
-reg [15:0] front_address;
-reg [15:0] back_address;
+reg [15:0] front_address = 16'h0;
+reg [15:0] back_address = 16'h0;
 assign RAM_A = front_address;
 
 always @(posedge CLK) begin
@@ -168,6 +168,7 @@ always @(posedge CLK) begin
 
             state <= STATE_IDLE;
         end
+
     endcase
 
     if (!cp_req_sync)
