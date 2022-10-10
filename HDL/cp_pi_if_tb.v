@@ -1,56 +1,57 @@
 `timescale 1ns/1ps
 
-module test;
+module cp_pi_if_test;
 
-  parameter MEM_A_BITS = 16;
-  parameter MEM_SIZE = (2 ** MEM_A_BITS);
  // 100(?) MHz.
   logic CLK = 0;
 
   // inputs from clock-port
-  logic RTC_CS_n = 1'b1;
-  logic IORD_n = 1'b1;
-  logic IOWR_n = 1'b1;
+  logic       RTC_CS_n = 1'b1;
+  logic       IORD_n = 1'b1;
+  logic       IOWR_n = 1'b1;
   logic [1:0] CP_A = 2'b0;
+  logic       INT6_n;
 
-  logic PI_REQ = 1'b0;
-  logic PI_WR = 1'b0;
+  // lines from Raspberry PI
+  logic       PI_REQ = 1'b0;
+  logic       PI_WR = 1'b0;
   logic [1:0] PI_A = 2'b0;
-
+  logic       PI_IRQ;
   // output
-  input logic PI_ACK;
+  logic       PI_ACK;
   // inout
-  inout wire [7:0] D;
-  // output
+  logic [7:0] PI_D;
+
+  // shared data bus
+  inout logic [7:0] D;
+  inout logic [7:0] CP_Data;
+
+  // latch control outputs
   input logic LE_OUT; // = 1'b0,
   input logic OE_IN_n; // = 1'b1,
   input logic OE_OUT_n; // !cp_rd
-  // inout
-  inout logic [7:0] PI_D;
-  // output
-  input logic INT6_n;
-  input logic PI_IRQ;
 
+  // sram interface
   input logic [15:0] RAM_A;
   input logic RAM_OE_n; // = 1'b1,
   input logic RAM_WE_n; // = 1'b1
 
-  logic [7:0] SRAM [MEM_SIZE - 1:0]; // = {65536{8'h00}};
-
+  // CP latches
   logic [7:0] cp_data;
+  logic [7:0] cp_data_out;
   logic [7:0] pi_value;
 
   task cp_write_reg(input logic [1:0] register, input logic [7:0] value);
     begin
       // set reg 2 REG_A_LO to 55
-      @(posedge CLK)
+      @(negedge CLK)
       CP_A = register;
-      //D <= 8'h55;
       cp_data = value;
-      IOWR_n = 0;
-      # 1 RTC_CS_n = 0;
-      # 16 RTC_CS_n = 1;
-      # 1 IOWR_n = 1;
+      #1 IOWR_n = 0;
+      RTC_CS_n = 0;
+      # 80ns
+      RTC_CS_n = 1;
+      #1 IOWR_n = 1;
     end
   endtask
 
@@ -58,13 +59,13 @@ module test;
     begin
       // read from SRAM
       //# 1
-      @(posedge CLK)
+      @(negedge CLK)
       CP_A = register;
       IORD_n = 0;
-      # 1 RTC_CS_n = 0;
-      //# 10 value = D;
-      # 16 RTC_CS_n = 1;
-      # 1 IORD_n = 1;
+      #1 RTC_CS_n = 0;
+      # 80ns
+      RTC_CS_n = 1;
+      #1 IORD_n = 1;
     end
   endtask
 
@@ -73,12 +74,12 @@ module test;
       //# 1
       @(posedge CLK)
       // set reg 2 REG_A_LO to 55
-      PI_A = register;
-      //D <= 8'h55;
+      # 2ns PI_A = register;
       pi_value = value;
       PI_WR = 1;
-      # 1 PI_REQ = 1;
-      # 20 PI_REQ = 0;
+      PI_REQ = 1;
+      # 100ns PI_REQ = 0;
+      PI_WR = 0;
     end
   endtask
 
@@ -87,10 +88,10 @@ module test;
       //# 1
       @(posedge CLK)
       // read from SRAM
-      PI_A = register;
+      # 2ns PI_A = register;
       PI_WR = 0;
-      # 1 PI_REQ = 1;
-      # 20 PI_REQ = 0;
+      PI_REQ = 1;
+      # 100ns PI_REQ = 0;
     end
   endtask
 
@@ -128,14 +129,9 @@ module test;
 
   integer unsigned i;
   initial begin
-    for (i = 0; i < MEM_SIZE; i = i + 1)
-      SRAM[i] = 8'h0;
 
-    $dumpfile("test.vcd");
-    $dumpvars(0,test);
-
-    $display("memory address bus width %d", MEM_A_BITS);
-    $display("memory size %d", MEM_SIZE);
+    $dumpfile("cp_pi_if_test.vcd");
+    $dumpvars(0,cp_pi_if_test);
 
     // set irq reg
     //cp_write_reg(2'h1, 8'h0);
@@ -149,9 +145,15 @@ module test;
      // read from SRAM
      //read_reg(2'h0);
 
-     cp_write_mem(16'hBBAA, 8'hCC);
-     # 15
+     cp_write_mem(16'h1122, 8'hAA);
+     cp_write_reg(2'h0, 8'hBB);
+     cp_write_reg(2'h0, 8'hCC);
+     cp_write_reg(2'h0, 8'hDD);
+     # 100ns
      cp_read_mem(16'hBBAA);
+     cp_read_reg(2'h0);
+     cp_read_reg(2'h0);
+     cp_read_reg(2'h0);
 
      //cp_write_mem(16'hBBAA, 8'hDD);
      //cp_read_mem(16'hBBAA);
@@ -162,32 +164,33 @@ module test;
      //cp_write_mem(16'hBBAA, 8'hFF);
      //cp_read_mem(16'hBBAA);
 
-     # 15
+     //# 100ns
 
-     pi_write_mem(16'h1234, 8'h78);
-     # 15
-     pi_read_mem(16'h1234);
+     //pi_write_mem(16'h1234, 8'h78);
+     //# 100ns
+     //pi_read_mem(16'h1234);
      //pi_read_reg(2'h3);
 
-     # 50ns $finish;
+     # 10ns $finish;
   end
 
   /* Make a regular pulsing clock. */
   //reg CLK = 0;
   always
-     # 1 CLK = !CLK;
+     # 5ns CLK = !CLK;
 
-  always @(negedge RAM_WE_n)
-  begin
-    SRAM[RAM_A] = D;
-  end
+   //assign D = IOWR_n ? 8'bz : (OE_IN_n ? 8'bz : cp_data);
+   assign CP_Data = IOWR_n ? 8'bz : cp_data;
 
-  //assign D = IOWR_n ? ( !LE_OUT && RAM_OE_n ? 8'bz : SRAM[RAM_A] ) : cp_date;
-  assign D = IOWR_n ? ( RAM_OE_n ? 8'bz : SRAM[RAM_A] ) : (OE_IN_n ? 8'hz : cp_data);
-  //assign D = IOWR_n ? ( RAM_OE_n ? 8'bz : SRAM ) : cp_data;
-  assign PI_D = PI_REQ && PI_WR ? pi_value : 8'bz;
+  //assign PI_D = PI_REQ && PI_WR ? pi_value : 8'bz;
 
   cp_pi_if cp1 (CLK, RTC_CS_n, IORD_n, IOWR_n, CP_A, PI_REQ, PI_WR, PI_A, PI_ACK, D, LE_OUT, OE_IN_n, OE_OUT_n, PI_D, INT6_n, PI_IRQ, RAM_A, RAM_OE_n, RAM_WE_n);
+  //                      /CE
+  SRAM memory1 (RAM_A, D, 1'b0, RAM_WE_n, RAM_OE_n);
+  // latch with outputs towards CP (IC2)
+  latch latch_out(D, CP_Data, LE_OUT, OE_OUT_n);
+  // latch with outputs towards A314 (IC3)
+  latch latch_in(CP_Data, D, 1'b1, OE_IN_n);
 
   initial
     begin
