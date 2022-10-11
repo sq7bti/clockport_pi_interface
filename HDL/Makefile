@@ -6,7 +6,7 @@ all: cp_pi_if_tb sram_tb latch_tb
 clean:
 	rm -rf cp_pi_if_tb cp_pi_if sram sram_tb latch latch_tb test.vcd
 
-cp_pi_if_tb: cp_pi_if_tb.v cp_pi_if.v sram.v latch.v
+cp_pi_if_tb: cp_pi_if_tb.v cp_pi_if.v sram.v latch.v amiga_cp.v
 	iverilog -g2012 -o $@ $^
 	vvp $@
 	pidof gtkwave || gtkwave cp_pi_if_test.vcd &
@@ -20,3 +20,8 @@ latch_tb: latch_tb.v latch.v
 	iverilog -g2012 -o $@ $^
 	vvp $@
 	pidof gtkwave || gtkwave latch_test.vcd &
+
+amiga_cp_tb: amiga_cp_tb.v amiga_cp.v
+		iverilog -g2012 -o $@ $^
+		vvp $@
+		pidof gtkwave || gtkwave amiga_cp_test.vcd &

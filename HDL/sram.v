@@ -17,7 +17,7 @@ always @(CS or WE)
       Memory[A] = D;
     end else begin
       Memory[A] = D;
-      //$display("Write in SRAM[%x]: %x", A, D);
+      $display("Write in SRAM[%x]: %x", A, D);
     end
   end
 

@@ -4,9 +4,10 @@ module latch_test;
 
   output logic [7:0] D;
   input logic [7:0] Q;
+  // active high
+  output logic LE = 1'b0;
   // active low
-  output logic LE = 1'b1;
-  output logic OE = 1'b1;
+  output logic OE_n = 1'b1;
 
   integer unsigned i = 0;
 
@@ -22,7 +23,7 @@ module latch_test;
   end
 
   always begin
-    #7 OE = !OE;
+    #7 OE_n = !OE_n;
   end
 
   initial begin
@@ -35,6 +36,6 @@ module latch_test;
     # 10 $finish;
   end
 
-  latch dl1 (D, Q, LE, OE);
+  latch dl1 (D, Q, LE, OE_n);
 
 endmodule // test

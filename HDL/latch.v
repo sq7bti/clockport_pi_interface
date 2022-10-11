@@ -1,12 +1,12 @@
-module latch(D, Q, LE, OE);
+module latch(D, Q, LE, OE_n);
 
 input logic [7:0] D;
-output logic [7:0] Q;
-input logic LE, OE;
+output wire [7:0] Q;
+input logic LE, OE_n;
 
 reg [7:0] d_latch;
 
-assign Q = (!OE) ? d_latch : 8'bz;
+assign Q = (!OE_n) ? d_latch : 8'bz;
 
 always @(LE or D)
   if (LE)

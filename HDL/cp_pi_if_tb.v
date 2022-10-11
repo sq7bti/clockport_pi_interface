@@ -6,11 +6,19 @@ module cp_pi_if_test;
   logic CLK = 0;
 
   // inputs from clock-port
-  logic       RTC_CS_n = 1'b1;
-  logic       IORD_n = 1'b1;
-  logic       IOWR_n = 1'b1;
-  logic [1:0] CP_A = 2'b0;
+  input logic CS_n; // = 1'b1;
+  input logic IORD_n; // = 1'b1;
+  input logic IOWR_n; // = 1'b1;
+  logic [3:0] CP_A = 4'b0;
   logic       INT6_n;
+  output logic [7:0] D_write;
+  inout logic [7:0] D_read;
+  inout wire [1:0] A;
+  inout wire [7:0] CP_Data;
+  output logic [1:0] A_val;
+  output logic RnW = 0;
+  output logic request = 0;
+  output logic wait_states = 1;
 
   // lines from Raspberry PI
   logic       PI_REQ = 1'b0;
@@ -24,7 +32,6 @@ module cp_pi_if_test;
 
   // shared data bus
   inout logic [7:0] D;
-  inout logic [7:0] CP_Data;
 
   // latch control outputs
   input logic LE_OUT; // = 1'b0,
@@ -44,28 +51,24 @@ module cp_pi_if_test;
   task cp_write_reg(input logic [1:0] register, input logic [7:0] value);
     begin
       // set reg 2 REG_A_LO to 55
-      @(negedge CLK)
-      CP_A = register;
-      cp_data = value;
-      #1 IOWR_n = 0;
-      RTC_CS_n = 0;
-      # 80ns
-      RTC_CS_n = 1;
-      #1 IOWR_n = 1;
+      D_write = value;
+      A_val = register;
+      RnW = 1'b0;
+      request = 1;
+      #2us
+      request = 0;
     end
   endtask
 
   task cp_read_reg(input logic [1:0] register);
     begin
       // read from SRAM
-      //# 1
-      @(negedge CLK)
-      CP_A = register;
-      IORD_n = 0;
-      #1 RTC_CS_n = 0;
-      # 80ns
-      RTC_CS_n = 1;
-      #1 IORD_n = 1;
+      //D_write = value;
+      A_val = register;
+      RnW = 1'b1;
+      request = 1;
+      #2us
+      request = 0;
     end
   endtask
 
@@ -150,7 +153,7 @@ module cp_pi_if_test;
      cp_write_reg(2'h0, 8'hCC);
      cp_write_reg(2'h0, 8'hDD);
      # 100ns
-     cp_read_mem(16'hBBAA);
+     cp_read_mem(16'h1122);
      cp_read_reg(2'h0);
      cp_read_reg(2'h0);
      cp_read_reg(2'h0);
@@ -176,21 +179,33 @@ module cp_pi_if_test;
 
   /* Make a regular pulsing clock. */
   //reg CLK = 0;
-  always
-     # 5ns CLK = !CLK;
+  always // 85MHz
+     # 6ns CLK = !CLK;
 
-   //assign D = IOWR_n ? 8'bz : (OE_IN_n ? 8'bz : cp_data);
-   assign CP_Data = IOWR_n ? 8'bz : cp_data;
+  //assign D = IOWR_n ? 8'bz : (OE_IN_n ? 8'bz : cp_data);
+  //assign CP_Data = IOWR_n ? 8'bz : (OE_IN_n ? 8'bz : cp_data);
+  //assign CP_Data = IOWR_n ? 8'bz : cp_data;
+  //assign D = IOWR_n ? 8'bz : cp_data;
 
   //assign PI_D = PI_REQ && PI_WR ? pi_value : 8'bz;
 
-  cp_pi_if cp1 (CLK, RTC_CS_n, IORD_n, IOWR_n, CP_A, PI_REQ, PI_WR, PI_A, PI_ACK, D, LE_OUT, OE_IN_n, OE_OUT_n, PI_D, INT6_n, PI_IRQ, RAM_A, RAM_OE_n, RAM_WE_n);
+  cp_pi_if a314(CLK, CS_n, IORD_n, IOWR_n, A,
+                PI_REQ, PI_WR, PI_A, PI_ACK,
+                D,
+                LE_OUT, OE_IN_n, OE_OUT_n,
+                PI_D,
+                INT6_n, PI_IRQ,
+                RAM_A, RAM_OE_n, RAM_WE_n);
+
   //                      /CE
   SRAM memory1 (RAM_A, D, 1'b0, RAM_WE_n, RAM_OE_n);
+
   // latch with outputs towards CP (IC2)
   latch latch_out(D, CP_Data, LE_OUT, OE_OUT_n);
   // latch with outputs towards A314 (IC3)
   latch latch_in(CP_Data, D, 1'b1, OE_IN_n);
+
+  amiga_cp amiga_clock_port(CP_Data, D_write, D_read, A, A_val, CS_n, INT6_n, IOWR_n, IORD_n, RESET_n, wait_states, RnW, request);
 
   initial
     begin
