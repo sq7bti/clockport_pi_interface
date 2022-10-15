@@ -54,9 +54,9 @@ module cp_pi_if_test;
       D_write = value;
       A_val = register;
       RnW = 1'b0;
-      request = 1;
-      #2us
-      request = 0;
+      #100ns request = 1;
+      #1 request = 0;
+      #2us request = 0;
     end
   endtask
 
@@ -66,9 +66,9 @@ module cp_pi_if_test;
       //D_write = value;
       A_val = register;
       RnW = 1'b1;
-      request = 1;
-      #2us
-      request = 0;
+      #100ns request = 1;
+      #1 request = 0;
+      #2us request = 0;
     end
   endtask
 

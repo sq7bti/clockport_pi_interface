@@ -7,7 +7,7 @@ module amiga_cp_test;
   output logic [7:0] D_write = 8'h0;
   input logic [7:0] D_read;
   input logic [1:0] A;
-  output logic [1:0] A_val;
+  output logic [1:0] A_val = 8'h0;
   input logic CS_n;
   input logic IOWR_n;
   input logic IORD_n;
@@ -21,44 +21,59 @@ module amiga_cp_test;
   output logic RnW = 0;
   output logic request = 0;
 
-  always begin
+  always @(posedge request)
+  begin
     #1 D_write = D_write + 1;
   end
+
+  always @(posedge request)
+  begin
+    #1 A_val = A_val + 1;
+  end
+
 
   initial begin
 
     $dumpfile("amiga_cp_test.vcd");
     $dumpvars(0,amiga_cp_test);
 
-    wait_states = 0;
     RnW = 1;
-    request = 1;
-    #1us
-    request = 0;
+    wait_states = 0;
 
-    #2us
+    #1us
+
+    request = 1;
+    #1 request = 0;
+
+    #3us
 
     wait_states = 1;
     RnW = 1;
-    request = 1;
-    #1us
-    request = 0;
 
-    #2us
+    #1us
+
+    request = 1;
+    #1 request = 0;
+
+    #3us
 
     wait_states = 0;
     RnW = 0;
-    request = 1;
-    #1us
-    request = 0;
 
-    #2us
+    #1us
+
+    request = 1;
+    #1 request = 0;
+
+    #3us
 
     wait_states = 1;
     RnW = 0;
-    request = 1;
+
     #1us
-    request = 0;
+
+    request = 1;
+    #1 request = 0;
 
     #2us
 
